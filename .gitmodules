@@ -1,9 +1,3 @@
-[submodule "glow"]
-	path = glow
-	url = https://github.com/openai/glow
-[submodule "bcsd-python"]
-	path = bcsd-python
-	url = https://github.com/tjvandal/bcsd-python
-[submodule "sylvester-flows"]
-	path = sylvester-flows
-	url = https://github.com/riannevdberg/sylvester-flows
+[submodule "normalizing_flows"]
+	path = normalizing_flows
+	url = git@github.com:bgroenks96/normalizing-flows
