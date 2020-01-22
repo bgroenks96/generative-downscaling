@@ -37,26 +37,36 @@ class BernoulliGamma(tfp.distributions.Distribution):
         beta = self.gamma.rate
         return p*alpha*(1.0 + (1.0 - p)*alpha) / beta**2
 
-def bernoulli_gamma(params: tf.Tensor, bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
+def bernoulli_gamma(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
     """
-    Returns a join Bernoulli-Gamma distribution, paramterized by 'params'.
+    Returns a joint Bernoulli-Gamma distribution constructor, paramterized by 'params'.
     Parameters p, alpha, beta are selected from the given axis, in that order.
     """
-    logits = tf.gather(params, 0, axis=axis)
-    alpha = tf.math.log1p(epsilon + tf.math.exp(tf.gather(params, 1, axis=axis)))
-    beta = tf.math.log1p(epsilon + tf.math.exp(tf.gather(params, 2, axis=axis)))
-    base_dist BernoulliGamma(logits, alpha, beta)
-    transformed_dist = tfp.distributions.TransformedDistribution(base_dist, bijector=bijector)
-    return transformed_dist
+    def _bernoulli_gamma(params: tf.Tensor):
+        logits = tf.gather(params, [0], axis=axis)
+        alpha = tf.math.log1p(epsilon + tf.math.exp(tf.gather(params, [1], axis=axis)))
+        beta = tf.math.log1p(epsilon + tf.math.exp(tf.gather(params, [2], axis=axis)))
+        base_dist = BernoulliGamma(logits, alpha, beta)
+        transformed_dist = tfp.distributions.TransformedDistribution(base_dist, bijector=bijector)
+        return transformed_dist
+    return _bernoulli_gamma
 
-def normal(params: tf.Tensor, bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
-    mus = tf.gather(params, 0, axis=axis)
-    log_sigmas = tf.gather(params, 1, axis=axis)
-    #shape = tf.shape(mus)
-    #mus = tf.reshape(mus, (-1, tf.math.reduce_prod(shape[1:])))
-    #log_sigmas = tf.reshape(log_sigmas, (-1, tf.math.reduce_prod(shape[1:])))
-    base_dist = tfp.distributions.Normal(loc=mus, scale=epsilon + tf.math.exp(log_sigmas), allow_nan_stats=False)
-    transformed_dist = tfp.distributions.TransformedDistribution(base_dist, bijector=bijector)
-    return transformed_dist
+def normal(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
+    def _normal(params: tf.Tensor):
+        mus = tf.gather(params, [0], axis=axis)
+        log_sigmas = tf.gather(params, [1], axis=axis)
+        base_dist = tfp.distributions.Normal(loc=mus, scale=epsilon + tf.math.exp(log_sigmas), allow_nan_stats=False)
+        transformed_dist = tfp.distributions.TransformedDistribution(base_dist, bijector=bijector)
+        return transformed_dist
+    return _normal
+
+def logistic(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
+    def _logistic(params: tf.Tensor):
+        mus = tf.gather(params, [0], axis=axis)
+        log_scales = tf.gather(params, [1], axis=axis)
+        base_dist = tfp.distributions.Logistic(loc=mus, scale=epsilon + tf.math.exp(log_scales), allow_nan_stats=False)
+        transformed_dist = tfp.distributions.TransformedDistribution(base_dist, bijector=bijector)
+        return transformed_dist
+    return _logistic
     
 
