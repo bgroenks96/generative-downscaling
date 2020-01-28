@@ -1,3 +1,6 @@
 [submodule "normalizing_flows"]
 	path = normalizing_flows
 	url = git@github.com:bgroenks96/normalizing-flows
+[submodule "climdex"]
+	path = climdex
+	url = git@github.com:bgroenks96/pyclimdex
