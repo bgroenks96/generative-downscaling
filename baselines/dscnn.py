@@ -40,7 +40,7 @@ def mixed_spatial_mse(input_lr, beta=0.5):
         return beta*mse_pointwise + (1. - beta)*mse_spatial
     return loss
 
-def create_srcnn(scale=None, c_in = 1, c_out = 1, c_aux=0, f_1 = 64, f_2 = 32, kernels=(9,1,5), output_activity='linear',
+def create_srcnn(wt=None, ht=None, scale=None, c_in = 1, c_out = 1, c_aux=0, f_1 = 64, f_2 = 32, kernels=(9,1,5), output_activity='linear',
                  hidden_activity='elu', loss='mse', optimizer='adam', alpha = 1.0E-5, beta=0.9, dropout_rate=0.1,
                  metrics=[], run_opts=None, run_metadata=None):
     """
@@ -65,7 +65,7 @@ def create_srcnn(scale=None, c_in = 1, c_out = 1, c_aux=0, f_1 = 64, f_2 = 32, k
     run_metadata    : Tensorflow run metadata
     """
     assert len(kernels) == 3
-    input_0 = Input(shape=(None, None, c_in))
+    input_0 = Input(shape=(wt, ht, c_in))
     aux_input = Input(shape=(None, None, c_aux))
     if scale is not None:
         x = UpSampling2D(scale, interpolation='bilinear')(input_0)
@@ -248,20 +248,7 @@ def create_bmg_cnn10(img_wt, img_ht, scale=2, c_in=1, c_out=1, filters=(50,25,10
     conv_2 = Conv2D(filters[1], kernel_sizes[1], activation='relu', padding='same')
     conv_3 = Conv2D(filters[2], kernel_sizes[2], activation='relu', padding='same')
     flatten = Flatten()
-    dense_out = Dense(img_wt*img_ht*c_out*scale**2, activation='linear')
+    dense_out = Dense(img_wt*img_ht*c_out*scale**2, activation='linear', kernel_initializer='zeros')
     reshape_out = Reshape((img_wt*scale, img_ht*scale, c_out))
     output_0 = reshape_out(dense_out(flatten(conv_3(conv_2(conv_1(input_0))))))
-    return Model(inputs=input_0, outputs=output_0)
-
-def create_variational_dscnn(scale=2, c_in=1, aux_in=0, c_out=1, num_filters=32):
-    """
-    Creates the CNN10 model from Bano-Medina et al. (2019)
-    https://doi.org/10.5194/gmd-2019-278
-    """
-    input_0 = Input(shape=(None, None, c_in))
-    if aux_in > 0:
-        input_1 = Input(shape=(None, None, aux_in))
-    conv_1 = Conv2D(num_filters, 3, activation='relu', padding='same')
-    conv_2 = Conv2D(num_filters, 3, activation='relu', padding='same')
-    conv_3 = Conv2DTranspose(num_filters, 3, strides=scale, activation='relu', padding='same')
     return Model(inputs=input_0, outputs=output_0)
