@@ -57,7 +57,7 @@ def normal(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
         log_sigmas = tf.gather(params, [1], axis=axis)
         base_dist = tfp.distributions.Normal(loc=mus, scale=epsilon + tf.math.exp(log_sigmas), allow_nan_stats=False)
         transformed_dist = tfp.distributions.TransformedDistribution(base_dist, bijector=bijector)
-        return transformed_dist
+        return base_dist
     return _normal
 
 def logistic(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
