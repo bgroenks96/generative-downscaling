@@ -15,7 +15,7 @@ class BernoulliGamma(tfp.distributions.Distribution):
         self.gamma = tfp.distributions.Gamma(alpha, beta, validate_args=False, allow_nan_stats=False)
 
     def _log_prob(self, y, epsilon=1.0E-6, name='log_prob', **kwargs):
-        y_mask = y > 0
+        y_mask = y > epsilon
         return tf.where(y_mask,
                         self.bernoulli.log_prob(y_mask) + self.gamma.log_prob(epsilon + tf.math.maximum(0.0, y)),
                         self.bernoulli.log_prob(y_mask))
@@ -36,6 +36,83 @@ class BernoulliGamma(tfp.distributions.Distribution):
         alpha = self.gamma.concentration
         beta = self.gamma.rate
         return p*alpha*(1.0 + (1.0 - p)*alpha) / beta**2
+    
+class BernoulliLogNormal(tfp.distributions.Distribution):
+    def __init__(self, probs, mu, sigma, dtype=tf.float32, validate_args=False, allow_nan_stats=False,
+                 epsilon=1.0E-5, batch_shape=(None,), name='BernoulliGamma'):
+        parameters = dict(locals())
+        super().__init__(dtype=dtype,
+                         reparameterization_type=tfp.distributions.NOT_REPARAMETERIZED,
+                         validate_args=validate_args,
+                         allow_nan_stats=allow_nan_stats,
+                         parameters=parameters,
+                         name=name)
+        self.bernoulli = tfp.distributions.Bernoulli(probs=probs, allow_nan_stats=False, dtype=tf.float32)
+        self.log_normal = tfp.distributions.LogNormal(loc=mu, scale=sigma, validate_args=False, allow_nan_stats=False)
+        self.epsilon = epsilon
+
+    def _log_prob(self, y, name='log_prob', **kwargs):
+        y_mask = y > self.epsilon
+        return tf.where(y_mask,
+                        self.bernoulli.log_prob(y_mask) + self.log_normal.log_prob(self.epsilon + tf.math.maximum(0.0, y)),
+                        self.bernoulli.log_prob(0.))
+    
+    def _sample_n(self, n, seed=None):
+        return self.bernoulli.sample(n, seed=seed)*self.log_normal.sample(n, seed=seed)
+    
+    def _mean(self):
+        p = self.bernoulli.probs_parameter()
+        mu = self.log_normal.loc
+        sigma = self.log_normal.scale
+        return p*tf.math.exp(mu + sigma**2 / 2.0)
+    
+    def _variance(self):
+        raise NotImplementedError()
+        
+    def _event_shape_tensor(self):
+        return tf.constant([], dtype=tf.int32)
+
+    def _event_shape(self):
+        return tf.TensorShape([])
+    
+class BernoulliExponential(tfp.distributions.Distribution):
+    def __init__(self, probs, lam, dtype=tf.float32, validate_args=False, allow_nan_stats=False,
+                 epsilon=1.0E-5, batch_shape=(None,), name='BernoulliGamma'):
+        parameters = dict(locals())
+        super().__init__(dtype=dtype,
+                         reparameterization_type=tfp.distributions.NOT_REPARAMETERIZED,
+                         validate_args=validate_args,
+                         allow_nan_stats=allow_nan_stats,
+                         parameters=parameters,
+                         name=name)
+        self.bernoulli = tfp.distributions.Bernoulli(probs=probs, allow_nan_stats=False, dtype=tf.float32)
+        self.exponential = tfp.distributions.Exponential(lam, validate_args=False, allow_nan_stats=False)
+        self.epsilon = epsilon
+
+    def _log_prob(self, y, name='log_prob', **kwargs):
+        y_mask = y > self.epsilon
+        return tf.where(y_mask,
+                        self.bernoulli.log_prob(y_mask) + self.exponential.log_prob(self.epsilon + tf.math.maximum(0.0, y)),
+                        self.bernoulli.log_prob(0.))
+    
+    def _sample_n(self, n, seed=None):
+        ber_sample = self.bernoulli.sample(n, seed=seed)
+        return tf.where(ber_sample > 0, self.exponential.sample(n, seed=seed),
+                        tf.random.uniform((n,), minval=self.epsilon/2, maxval=self.epsilon))
+    
+    def _mean(self):
+        p = self.bernoulli.probs_parameter()
+        lam = self.exponential.rate
+        return p/lam
+    
+    def _variance(self):
+        raise NotImplementedError()
+        
+    def _event_shape_tensor(self):
+        return tf.constant([], dtype=tf.int32)
+
+    def _event_shape(self):
+        return tf.TensorShape([])
 
 def bernoulli_gamma(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
     """
@@ -47,8 +124,8 @@ def bernoulli_gamma(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
         alpha = tf.math.log1p(epsilon + tf.math.exp(tf.gather(params, [1], axis=axis)))
         beta = tf.math.log1p(epsilon + tf.math.exp(tf.gather(params, [2], axis=axis)))
         base_dist = BernoulliGamma(logits, alpha, beta)
-        transformed_dist = tfp.distributions.TransformedDistribution(base_dist, bijector=bijector)
-        return transformed_dist
+        #transformed_dist = tfp.distributions.TransformedDistribution(base_dist, bijector=bijector)
+        return base_dist
     return _bernoulli_gamma
 
 def normal(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
@@ -56,7 +133,7 @@ def normal(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
         mus = tf.gather(params, [0], axis=axis)
         log_sigmas = tf.gather(params, [1], axis=axis)
         base_dist = tfp.distributions.Normal(loc=mus, scale=epsilon + tf.math.exp(log_sigmas), allow_nan_stats=False)
-        transformed_dist = tfp.distributions.TransformedDistribution(base_dist, bijector=bijector)
+        #transformed_dist = tfp.distributions.TransformedDistribution(base_dist, bijector=bijector)
         return base_dist
     return _normal
 
