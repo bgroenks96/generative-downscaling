@@ -3,11 +3,16 @@ import tensorflow.keras.backend as K
 import tensorflow_probability as tfp
 import numpy as np
 
-def scaled_mae_metric(scale):
-    s = K.constant(scale)
+def scaled_rmse_metric(scale=1.0, axis=0):
+    @tf.function
+    def scaled_rmse(y_true, y_pred):
+        return K.sqrt(K.mean(K.square((y_true - y_pred)*scale), axis=axis))
+    return scaled_rmse
+
+def scaled_mae_metric(scale=1.0, axis=0):
     @tf.function
     def scaled_mae(y_true, y_pred):
-        return K.mean(K.abs(y_true - y_pred)*s)
+        return K.mean(K.abs(y_true - y_pred)*scale, axis=axis)
     return scaled_mae
 
 def sparse_scaled_mae_metric(offset=0.0, scale=1.0, epsilon=1.0E-3):
@@ -32,13 +37,12 @@ def sparse_scaled_mae_metric(offset=0.0, scale=1.0, epsilon=1.0E-3):
         return K.sum(diff) / (n-n_m)
     return sparse_scaled_mae
 
-def bias_metric(offset=0.0, scale=1.0):
-    offs = K.constant(offset)
-    s = K.constant(scale)
+def bias_metric(offset=0.0, scale=1.0, axis=0):
+    @tf.function
     def bias(y_true, y_pred):
-        y_true = s*y_true + offs
-        y_pred = s*y_pred + offs
-        return K.mean(y_pred - y_true)
+        y_true = scale*y_true + offset
+        y_pred = scale*y_pred + offset
+        return K.mean(y_pred - y_true, axis=axis)
     return bias
 
 def sparse_bias_metric(offset=0.0, scale=1.0, epsilon=1.0E-3):
@@ -63,12 +67,19 @@ def sparse_bias_metric(offset=0.0, scale=1.0, epsilon=1.0E-3):
         return K.sum(diff) / (n-n_m)
     return sparse_scaled_mae
 
-def quantile_difference_metric(num_quantiles=1000):
-    def quantile_diff(y_true, y_pred):
-        yt_quantiles = tfp.stats.quantiles(y_true, num_quantiles, axis=0)
-        yp_quantiles = tfp.stats.quantiles(y_pred, num_quantiles, axis=0)
-        return tf.math.reduce_mean(yp_quantiles - yt_quantiles)
-    return quantile_diff
+def qqrsq_metric(num_quantiles=100, axis=0):
+    @tf.function
+    def rsquared(yt, yp):
+        unexplained_error = tf.math.reduce_sum((yt - yp)**2, axis=axis)
+        total_error = tf.math.reduce_sum((yt - tf.math.reduce_mean(yt, axis=axis))**2, axis=axis)
+        return 1.0 - (unexplained_error / total_error)
+    @tf.function
+    def qqrsq(y_true, y_pred):
+        yt_quantiles = tfp.stats.quantiles(y_true, num_quantiles, axis=axis)
+        yp_quantiles = tfp.stats.quantiles(y_pred, num_quantiles, axis=axis)
+        r2 = rsquared(yt_quantiles, yp_quantiles)
+        return r2
+    return qqrsq
 
 def stratified_skill_score_metric(class_centers, offset=0.0, scale=1.0, drop_n=0):
     """
@@ -78,6 +89,7 @@ def stratified_skill_score_metric(class_centers, offset=0.0, scale=1.0, drop_n=0
     """
     classes = K.constant(np.array(class_centers))
     indices = K.constant(np.array(range(len(class_centers))), dtype='int32')
+    @tf.function
     def skill_score(y_true, y_pred):
         y_true = y_true*scale + offset
         y_pred = y_pred*scale + offset
@@ -97,6 +109,7 @@ def stratified_kld_metric(class_centers, offset=0.0, scale=1.0):
     from keras.losses import kld
     classes = K.constant(np.array(class_centers))
     indices = K.constant(np.array(range(len(class_centers))), dtype='int32')
+    @tf.function
     def stratified_kld(y_true, y_pred):
         y_true = y_true*scale + offset
         y_pred = y_pred*scale + offset
@@ -114,6 +127,7 @@ def stratified_kld_metric(class_centers, offset=0.0, scale=1.0):
 
 def stratified_accuracy_metric(class_centers, offset=0.0, scale=1.0):
     classes = K.constant(np.array(class_centers))
+    @tf.function
     def stratified_acc(y_true, y_pred):
         y_true = y_true*scale + offset
         y_pred = y_pred*scale + offset
@@ -127,6 +141,7 @@ def stratified_accuracy_metric(class_centers, offset=0.0, scale=1.0):
 def stratified_f1_metric(class_centers, offset=0.0, scale=1.0):
     classes = K.constant(np.array(class_centers))
     indices = K.constant(np.array(range(len(class_centers))), dtype='int32')
+    @tf.function
     def stratified_f1(y_true, y_pred):
         y_true = y_true*scale + offset
         y_pred = y_pred*scale + offset
@@ -149,6 +164,7 @@ def stratified_f1_metric(class_centers, offset=0.0, scale=1.0):
 def stratified_mcc_metric(class_centers, offset=0.0, scale=1.0):
     classes = K.constant(np.array(class_centers))
     indices = K.constant(np.array(range(len(class_centers))), dtype='int32')
+    @tf.function
     def stratified_mcc(y_true, y_pred):
         import tensorflow as tf
         k = K.shape(classes)[0] # k classes

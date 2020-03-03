@@ -11,5 +11,5 @@ def remove_monthly_means(x, means=None, time_dim='Time', sparse=False):
 def restore_monthly_means(x, means, time_dim='Time'):
     month_index = f'{time_dim}.month'
     for month in np.unique(x[month_index]):
-        x = xr.where(x[month_index] == month, x + monthly_means.sel(month=month), x)
-    return x, monthly_means
+        x = xr.where(x[month_index] == month, x + means.sel(month=month), x)
+    return x

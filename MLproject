@@ -3,21 +3,45 @@ name: Generative downscaling
 conda_env: environment.yml
 
 entry_points:
-  glowds:
+  glow-jflvm-cv:
     parameters:
+      scale: {type: int, default: 4}
       layers: {type: int, default: 3}
       depth: {type: int, default: 8}
       min_filters: {type: int, default: 32}
       max_filters: {type: int, default: 256}
       lam: {type: float, default: 1.0}
+      alpha: {type: float, default: 0.0}
       dnet_layers: {type: int, default: 3}
       dnet_filters: {type: int, default: 64}
       batch_size: {type: int, default: 10}
-      epochs: {type: int, default: 50}
-      splits: {type: int, default: 5}
+      epochs: {type: int, default: 20}
+      validate_freq: {type: int, default: 5}
+      splits: {type: int, default: 3}
       var: {type: string, default: "MAXT"}
       auth: {type: string, default: "gcs.secret.json"}
-      data_lr: {type: string, default: "daily-1deg"}
+      data_lr: {type: string, default: "ras/daily-1deg"}
+    command: "python run_experiment.py glow-jflvm-cv {data_lr} --scale {scale} --layers {layers} --depth {depth} \
+                --min-filters {min_filters} --max-filters {max_filters} --lam {lam} --alpha {alpha} \
+                --dnet-layers {dnet_layers} --dnet-filters {dnet_filters} --splits {splits} --batch-size {batch_size} \
+                --var {var} --epochs {epochs} --validate-freq {validate_freq} --auth {auth}"
+                
+  bcsd:
+    parameters:
       scale: {type: int, default: 4}
-    command: "python run_glow_jflvm_cv.py {data_lr} {scale} --layers {layers} --depth {depth} --min-filters {min_filters} \
-                --max-filters {max_filters} --lam {lam} --dnet-layers {dnet_layers} --dnet-filters {dnet_filters}"
+      var: {type: string, default: "MAXT"}
+      auth: {type: string, default: "gcs.secret.json"}
+      
+    command: "python run_experiment.py bcsd --scale {scale} --var {var} --auth {auth}"
+    
+  bmd:
+    parameters:
+      scale: {type: int, default: 4}
+      epochs: {type: int, default: 20}
+      batch_size: {type: int, default: 60}
+      validate_freq: {type: int, default: 5}
+      var: {type: string, default: "MAXT"}
+      auth: {type: string, default: "gcs.secret.json"}
+      
+    command: "python run_experiment.py bmd --scale {scale} --var {var} --epochs {epochs} --batch_size {batch_size} \\
+                  --validate-freq {validate_freq} --auth {auth}"

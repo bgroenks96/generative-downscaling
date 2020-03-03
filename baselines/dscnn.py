@@ -238,17 +238,20 @@ def create_fsrcnn(scale, c=1, d=48, s=16, m=3, kernels=(9,1,5), output_activity=
     fsrcnn.compile(optimizer='adam', loss=loss, metrics=metrics, options=run_opts, run_metadata=run_metadata)
     return fsrcnn
 
-def create_bmg_cnn10(img_wt, img_ht, scale=2, c_in=1, c_out=1, filters=(50,25,10), kernel_sizes=(3,3,3)):
+def create_bmd_cnn10(img_ht, img_wt, scale=2, c_in=1, c_out=1, filters=(50,25,10), kernel_sizes=(3,3,3)):
     """
     Creates the CNN10 model from Bano-Medina et al. (2019)
     https://doi.org/10.5194/gmd-2019-278
+    
+    Reference impl:
+    https://github.com/SantanderMetGroup/DeepDownscaling/blob/master/2020_Bano_GMD_FULL.ipynb
     """
-    input_0 = Input(shape=(img_wt, img_ht, c_in))
+    input_0 = Input(shape=(img_ht, img_wt, c_in))
     conv_1 = Conv2D(filters[0], kernel_sizes[0], activation='relu', padding='same')
     conv_2 = Conv2D(filters[1], kernel_sizes[1], activation='relu', padding='same')
     conv_3 = Conv2D(filters[2], kernel_sizes[2], activation='relu', padding='same')
     flatten = Flatten()
-    dense_out = Dense(img_wt*img_ht*c_out*scale**2, activation='linear', kernel_initializer='zeros')
+    dense_out = Dense(img_wt*img_ht*c_out*scale**2, activation='linear')
     reshape_out = Reshape((img_wt*scale, img_ht*scale, c_out))
     output_0 = reshape_out(dense_out(flatten(conv_3(conv_2(conv_1(input_0))))))
     return Model(inputs=input_0, outputs=output_0)
