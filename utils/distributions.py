@@ -2,7 +2,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 class BernoulliGamma(tfp.distributions.Distribution):
-    def __init__(self, probs, alpha, beta, epsilon=1.0E-3, dtype=tf.float32, validate_args=False, allow_nan_stats=False,
+    def __init__(self, logits, alpha, beta, epsilon=1.0E-3, dtype=tf.float32, validate_args=False, allow_nan_stats=False,
                  batch_shape=(None,), name='BernoulliGamma'):
         parameters = dict(locals())
         super(BernoulliGamma, self).__init__(dtype=dtype,
@@ -12,7 +12,7 @@ class BernoulliGamma(tfp.distributions.Distribution):
                                              parameters=parameters,
                                              name=name)
         self.epsilon = epsilon
-        self.bernoulli = tfp.distributions.Bernoulli(probs=probs, allow_nan_stats=False, dtype=tf.float32)
+        self.bernoulli = tfp.distributions.Bernoulli(logits=logits, allow_nan_stats=False, dtype=tf.float32)
         self.gamma = tfp.distributions.Gamma(alpha, beta, validate_args=False, allow_nan_stats=False)
 
     def _log_prob(self, y, name='log_prob', **kwargs):
@@ -37,6 +37,12 @@ class BernoulliGamma(tfp.distributions.Distribution):
         alpha = self.gamma.concentration
         beta = self.gamma.rate
         return p*alpha*(1.0 + (1.0 - p)*alpha) / beta**2
+    
+    def _batch_shape_tensor(self):
+        return self.bernoulli.batch_shape_tensor()
+        
+    def _event_shape_tensor(self):
+        return self.bernoulli.event_shape_tensor()
     
 class BernoulliLogNormal(tfp.distributions.Distribution):
     def __init__(self, probs, mu, sigma, dtype=tf.float32, validate_args=False, allow_nan_stats=False,
@@ -70,12 +76,15 @@ class BernoulliLogNormal(tfp.distributions.Distribution):
     def _variance(self):
         raise NotImplementedError()
         
+    def _batch_shape_tensor(self):
+        return self.bernoulli.batch_shape_tensor()
+        
     def _event_shape_tensor(self):
-        return tf.constant([], dtype=tf.int32)
-
-    def _event_shape(self):
-        return tf.TensorShape([])
+        return self.bernoulli.event_shape_tensor()
     
+    def _event_shape(self):
+        return self.bernoulli.event_shape
+
 class BernoulliExponential(tfp.distributions.Distribution):
     def __init__(self, probs, lam, dtype=tf.float32, validate_args=False, allow_nan_stats=False,
                  epsilon=1.0E-5, batch_shape=(None,), name='BernoulliGamma'):
@@ -121,7 +130,7 @@ def bernoulli_gamma(bijector=None, axis=-1, epsilon=1.0E-6):
     Parameters p, alpha, beta are selected from the given axis, in that order.
     """
     def _bernoulli_gamma(params: tf.Tensor):
-        p = tf.nn.sigmoid(tf.gather(params, [0], axis=axis))
+        logits = tf.gather(params, [0], axis=axis)
         alpha = tf.math.log1p(epsilon + tf.math.exp(tf.gather(params, [1], axis=axis)))
         beta = tf.math.log1p(epsilon + tf.math.exp(tf.gather(params, [2], axis=axis)))
         dist = BernoulliGamma(logits, alpha, beta)
@@ -130,7 +139,7 @@ def bernoulli_gamma(bijector=None, axis=-1, epsilon=1.0E-6):
         return dist
     return _bernoulli_gamma
 
-def normal(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
+def normal(bijector=None, axis=-1, epsilon=1.0E-6):
     def _normal(params: tf.Tensor):
         mus = tf.gather(params, [0], axis=axis)
         log_sigmas = tf.gather(params, [1], axis=axis)
@@ -140,7 +149,7 @@ def normal(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
         return dist
     return _normal
 
-def logistic(bijector=tfp.bijectors.Identity(), axis=-1, epsilon=1.0E-6):
+def logistic(bijector=None, axis=-1, epsilon=1.0E-6):
     def _logistic(params: tf.Tensor):
         mus = tf.gather(params, [0], axis=axis)
         log_scales = tf.gather(params, [1], axis=axis)

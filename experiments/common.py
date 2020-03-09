@@ -21,6 +21,8 @@ def load_data(data_lr, data_hr, region, auth_token, scale=4, project='thesis-res
         region_fn = southeast_us
     elif region == 'pacific_nw':
         region_fn = pacific_nw
+    else:
+        raise NotImplementedError(f'region {region} not recognized')
     data = EraiRasDataLoader(gcs_bucket='erai-rasmussen', gcs_project=project, auth=auth_token)
     if data_lr.startswith('ras/'):
         data_lr = xr.open_zarr(data.rasmussen(data_lr.split('/')[-1]), consolidated=True)

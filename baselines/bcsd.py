@@ -82,7 +82,8 @@ class BCSD:
         X_dayavg = obsv_interp.groupby(f'{self.time_dim}.dayofyear').mean(dim=self.time_dim)
         y_dayavg = obsv.groupby(f'{self.time_dim}.dayofyear').mean(dim=self.time_dim)
         for day in range(1,367):
-            scaling_factor = y_dayavg.sel(dayofyear=day) / X_dayavg.sel(dayofyear=day)
+            x_avg = X_dayavg.sel(dayofyear=day)
+            scaling_factor = y_dayavg.sel(dayofyear=day) / xr.where(x_avg > 0.0, x_avg, 1.0)
             self.scaling_factors[day] = scaling_factor.drop('dayofyear')
         self.qmap = qmap
         return self

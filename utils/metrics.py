@@ -45,27 +45,51 @@ def bias_metric(offset=0.0, scale=1.0, axis=0):
         return K.mean(y_pred - y_true, axis=axis)
     return bias
 
-def sparse_bias_metric(offset=0.0, scale=1.0, epsilon=1.0E-3):
-    eps = K.constant(np.array(epsilon))
-    s = K.constant(scale)
+def sparse_bias_metric(offset=0.0, scale=1.0, epsilon=1.0E-4, axis=0):
     @tf.function
-    def sparse_scaled_mae(y_true, y_pred):
-        y_true = s*y_true + offset
-        y_pred = s*y_pred + offset
+    def sparse_scaled_bias(y_true, y_pred):
+        y_true = scale*y_true + offset
+        y_pred = scale*y_pred + offset
         # absolute error over all points
         diff = y_pred - y_true
         # compute mask over points we want to ignore
-        y_zero = K.cast(K.abs(y_true) < eps, dtype='float32')
-        d_zero = K.cast(K.abs(diff) < eps, dtype='float32')
+        y_zero = K.cast(K.abs(y_true) < epsilon, dtype='float32')
+        d_zero = K.cast(K.abs(diff) < epsilon, dtype='float32')
         # combine masks with logical and/multiply op
         mask = y_zero*d_zero
         # sum over masks to count the number of negligble values
-        n_m = K.sum(mask)
+        n_m = K.sum(mask, axis=axis)
         # compute the total number of values as the product of shape
-        n = K.cast(K.prod(K.shape(diff)), dtype='float32')
+        if axis is not None:
+            n =  K.cast(K.shape(diff)[axis], dtype='float32')
+        else:
+            n = K.cast(K.prod(K.shape(diff)), dtype='float32')
         # return the adjusted mean ignoring zero values with low error
-        return K.sum(diff) / (n-n_m)
-    return sparse_scaled_mae
+        return K.sum(diff, axis=axis) / (n-n_m)
+    return sparse_scaled_bias
+
+def sparse_rmse_metric(offset=0.0, scale=1.0, epsilon=1.0E-4, axis=0):
+    @tf.function
+    def sparse_scaled_rmse(y_true, y_pred):
+        y_true = scale*y_true + offset
+        y_pred = scale*y_pred + offset
+        # absolute error over all points
+        sqerr = K.square(y_pred - y_true)
+        # compute mask over points we want to ignore
+        y_zero = K.cast(K.abs(y_true) < epsilon, dtype='float32')
+        d_zero = K.cast(K.abs(sqerr) < epsilon, dtype='float32')
+        # combine masks with logical and/multiply op
+        mask = y_zero*d_zero
+        # sum over masks to count the number of negligble values
+        n_m = K.sum(mask, axis=axis)
+        # compute the total number of values as the product of shape
+        if axis is not None:
+            n = K.cast(K.shape(sqerr)[axis], dtype='float32')
+        else:
+            n = K.cast(K.prod(K.shape(sqerr)), dtype='float32')
+        # return the adjusted mean ignoring zero values with low error
+        return K.sqrt(K.sum(sqerr, axis=axis) / (n-n_m))
+    return sparse_scaled_rmse
 
 def qqrsq_metric(num_quantiles=100, axis=0):
     @tf.function
@@ -80,6 +104,17 @@ def qqrsq_metric(num_quantiles=100, axis=0):
         r2 = rsquared(yt_quantiles, yp_quantiles)
         return r2
     return qqrsq
+
+def correlation_metric(axis=0, event_axis=-1):
+    @tf.function
+    def correlation(y_true, y_pred):
+        yt_sigma = tfp.stats.stddev(y_true, sample_axis=axis, keepdims=True)
+        yp_sigma = tfp.stats.stddev(y_pred, sample_axis=axis, keepdims=True)
+        # handle zero variance cases, unlike tfp.stats.correlation impl...
+        yt_sigma = tf.where(yt_sigma > 0.0, yt_sigma, 1.0)
+        yp_sigma = tf.where(yp_sigma > 0.0, yp_sigma, 1.0)
+        return tfp.stats.covariance(x=y_true/yt_sigma, y=y_pred/yp_sigma, sample_axis=axis, event_axis=event_axis)
+    return correlation
 
 def stratified_skill_score_metric(class_centers, offset=0.0, scale=1.0, drop_n=0):
     """

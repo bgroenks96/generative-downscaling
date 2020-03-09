@@ -12,7 +12,7 @@ from experiments.common import prepare_downscaling_data
 
 eval_rmse = metrics.scaled_rmse_metric()
 eval_bias = metrics.bias_metric()
-eval_qqrsq = metrics.qqrsq_metric()
+eval_corr = metrics.correlation_metric()
 
 class TemperatureDataFold:
     def __init__(self, train, test, monthly_means):
@@ -49,39 +49,29 @@ def eval_metrics(indices, true: tf.Tensor, pred: tf.Tensor, coords, monthly_mean
     # pointwise metrics
     rmse = eval_rmse(true, pred).numpy()
     bias = eval_bias(true, pred).numpy()
-    qqrsq = eval_qqrsq(true, pred).numpy()
+    corr = eval_corr(true, pred).numpy()
     # climdex indices
-    true_arr = xr.DataArray(true.numpy(), coords=coords)
     pred_arr = xr.DataArray(pred.numpy(), coords=coords)
     if monthly_means is not None:
-        true_arr = restore_monthly_means(true_arr, monthly_means)
         pred_arr = restore_monthly_means(pred_arr, monthly_means)
-    txx_true = indices.monthly_txx(true_arr)
-    txx_pred = indices.monthly_txx(pred_arr)
-    txn_true = indices.monthly_txn(true_arr)
-    txn_pred = indices.monthly_txn(pred_arr)
-    txid_true = indices.annual_icing_days(true_arr)
-    txid_pred = indices.annual_icing_days(pred_arr)
-    txsd_true = indices.annual_summer_days(true_arr)
-    txsd_pred = indices.annual_summer_days(pred_arr)
-    txx_bias = txx_pred - txx_true
-    txn_bias = txn_pred - txn_true
-    txid_bias = txid_pred - txid_true
-    txsd_bias = txsd_pred - txsd_true
-    return {'rmse': rmse, 'bias': bias, 'qqrsq': qqrsq,
-            'txx_bias': txx_bias, 'txn_bias': txn_bias,
-            'txid_bias': txid_bias, 'txsd_bias': txsd_bias}
+    txx = indices.monthly_txx(pred_arr)
+    txn = indices.monthly_txn(pred_arr)
+    txid = indices.annual_icing_days(pred_arr)
+    txsd = indices.annual_summer_days(pred_arr)
+    return {'rmse': rmse, 'bias': bias, 'corr': corr,
+            'txx': txx, 'txn': txn,
+            'txid': txid, 'txsd': txsd}
 
 def plot_indices(metrics):
-    names = ['txx_bias', 'txn_bias', 'txid_bias', 'txsd_bias']
+    names = ['txx', 'txn', 'txid', 'txsd']
     indices_avg = {k: v.mean(dim=['lat', 'lon', 'chan']).values for k, v in metrics.items() if k in names}
     fig = plt.figure(figsize=(8,6))
     plt.subplot(1,2,1)
-    sns.boxplot(x=['txx bias', 'txn bias'], y=[indices_avg['txx_bias'], indices_avg['txn_bias']])
-    plt.title('Monthly max/min temperature, bias')
+    sns.boxplot(x=['txx', 'txn'], y=[indices_avg['txx'], indices_avg['txn']])
+    plt.title('Monthly max/min temperature')
     plt.subplot(1,2,2)
-    sns.boxplot(x=['icing days bias', 'summer days bias'], y=[indices_avg['txid_bias'], indices_avg['txsd_bias']])
-    plt.title('Annual number of icing/summer days, bias')
+    sns.boxplot(x=['icing days', 'summer days'], y=[indices_avg['txid'], indices_avg['txsd']])
+    plt.title('Annual number of icing/summer days')
     return fig
 
 def plot_error_maps(metrics, lat, lon):
@@ -90,6 +80,6 @@ def plot_error_maps(metrics, lat, lon):
     plot_fn(axs[0], metrics['rmse'], lat, lon, title='spatial rmse', cmap='Reds', min_max=(0.0, rmse_max))
     bias_max = np.quantile(metrics['bias'], 0.95).round(2)
     plot_fn(axs[1], metrics['bias'], lat, lon, title='spatial bias', cmap='bwr', min_max=(-bias_max, bias_max))
-    qqrsq_min = metrics['qqrsq'].min()
-    plot_fn(axs[2], metrics['qqrsq'], lat, lon, title='spatial QQ $R^2$', cmap='copper', min_max=(qqrsq_min,1.0))
+    qqrsq_min = metrics['corr'].min()
+    plot_fn(axs[2], metrics['corr'], lat, lon, title='correlation per dim', cmap='copper', min_max=(qqrsq_min,1.0))
     return fig

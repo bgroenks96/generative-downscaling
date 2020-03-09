@@ -3,10 +3,6 @@ import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 from matplotlib.colors import ListedColormap
 
-def load_prcp_cmap(name='precip3_16lev'):
-    import Ngl
-    return ListedColormap(Ngl.read_colormap_file('precip3_16lev'))
-
 def plot_image(X):
     X = num_to_nan(X, lo_thresh=50.0)
     X_min, X_max = 240, 330
@@ -54,3 +50,24 @@ def image_map_factory(rows, cols, figsize=(6,4), cmap='viridis', min_max=None, b
             ax.set_title(title)
         return cs
     return fig, axarr, plot_next
+
+def prcp_cmap():
+    colors = [(255.,255.,255.),
+              (214.,226.,255.),
+              (181.,201.,255.),
+              (142.,178.,255.),
+              (127.,150.,255.),
+              (99.,112.,247.),
+              (0.,99.,255.),
+              (0.,150.,150.),
+              (0.,198.,51.),
+              (99.,255.,0.),
+              (150.,255.,0.),
+              (198.,255.,51.),
+              (255.,255.,0.),
+              (255.,198.,0.),
+              (255.,160.,0.),
+              (255.,124.,0.),
+              (255.,25.,0.)]
+    colors = np.array(colors) / 255.
+    return ListedColormap(colors)
