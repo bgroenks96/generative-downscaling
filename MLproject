@@ -16,9 +16,10 @@ entry_points:
       dnet_filters: {type: int, default: 64}
       batch_size: {type: int, default: 10}
       epochs: {type: int, default: 20}
-      validate_freq: {type: int, default: 5}
+      validate_freq: {type: int, default: 10}
       prior: {type: string, default: "standard"}
       mode: {type: string, default: "cv"}
+      test_size: {type: int, default: 146}
       splits: {type: int, default: 3}
       var: {type: string, default: "MAXT"}
       region: {type: string, default: "southeast_us"}
@@ -26,7 +27,7 @@ entry_points:
       data_lr: {type: string, default: "ras/daily-1deg"}
     command: "python run_experiment.py glow-jflvm {data_lr} --scale {scale} --layers {layers} --depth {depth} \
                 --min-filters {min_filters} --max-filters {max_filters} --lam {lam} --alpha {alpha} --prior {prior} \
-                --dnet-layers {dnet_layers} --dnet-filters {dnet_filters} --splits {splits} --batch-size {batch_size} \
+                --dnet-layers {dnet_layers} --dnet-filters {dnet_filters} --splits {splits} --test-size {test_size} --batch-size {batch_size} \
                 --var {var} --epochs {epochs} --validate-freq {validate_freq} --region {region} --mode {mode} --auth {auth}"
 
   bcsd:
@@ -34,19 +35,24 @@ entry_points:
       data_lr: {type: string, default="erai/daily-1deg"}
       scale: {type: int, default: 4}
       var: {type: string, default: "MAXT"}
+      test_size: {type: int, default: 146}
+      splits: {type: int, default: 3}
       auth: {type: string, default: "gcs.secret.json"}
       
-    command: "python run_experiment.py bcsd {data_lr} --scale {scale} --var {var} --auth {auth}"
+    command: "python run_experiment.py bcsd {data_lr} --scale {scale} --var {var} --test-size {test_size} \
+                --splits {splits} --auth {auth}"
     
   bmd:
     parameters:
       scale: {type: int, default: 4}
       epochs: {type: int, default: 50}
       batch_size: {type: int, default: 100}
-      validate_freq: {type: int, default: 5}
+      validate_freq: {type: int, default: 10}
       var: {type: string, default: "MAXT"}
+      test_size: {type: int, default: 146}
+      splits: {type: int, default: 3}
       data_lr: {type: string, default: "ras/daily-1deg"}
       auth: {type: string, default: "gcs.secret.json"}
       
     command: "python run_experiment.py bmd {data_lr} --scale {scale} --var {var} --epochs {epochs} --batch-size {batch_size} \
-                  --validate-freq {validate_freq} --auth {auth}"
+                  --test-size {test_size} --splits {splits} --validate-freq {validate_freq} --auth {auth}"

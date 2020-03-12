@@ -12,10 +12,13 @@ import experiments.maxt_experiment_base as maxt
 import experiments.prcp_experiment_base as prcp
 from utils.plot import image_map_factory
 from utils.preprocessing import remove_monthly_means
+from utils.data import create_time_series_train_test_generator_v2
 from baselines.bcsd import BCSD
 from experiments.common import load_data
 
-def fit_bcsd_maxt(lr_train, lr_test, lr_obs_train, lr_obs_test, hr_train, hr_test):
+def fit_bcsd_maxt(fold, i):
+    mlflow.log_param('fold', i+1)
+    (lr_train, lr_obs_train, hr_train), (lr_test, lr_obs_test, hr_test) = fold
     indices = tdex.indices('Time', convert_units_fn=lambda x: x + 273.15)
     bcsd = BCSD(verbose=True)
     bcsd.fit(lr_train, hr_train, lr_obs_train)
@@ -35,8 +38,10 @@ def fit_bcsd_maxt(lr_train, lr_test, lr_obs_train, lr_obs_test, hr_train, hr_tes
     plt.savefig(f'/tmp/error-maps.png')
     mlflow.log_artifact(f'/tmp/error-maps.png', 'figures')
     
-def fit_bcsd_prcp(lr_train, lr_test, lr_obs_train, lr_obs_test, hr_train, hr_test):
+def fit_bcsd_prcp(fold, i):
+    mlflow.log_param('fold', i)
     indices = pdex.indices('Time')
+    (lr_train, lr_obs_train, hr_train), (lr_test, lr_obs_test, hr_test) = fold
     bcsd = BCSD(verbose=True)
     bcsd.fit(lr_train, hr_train, lr_obs_train)
     hr_pred = bcsd.predict(lr_test).compute()
@@ -61,9 +66,11 @@ def fit_bcsd_prcp(lr_train, lr_test, lr_obs_train, lr_obs_test, hr_train, hr_tes
 @click.option("--scale", type=click.INT, required=True, help="Downscaling factor")
 @click.option("--region", type=click.STRING, default='southeast_us')
 @click.option("--var", type=click.STRING, default='MAXT', help="Dataset var name")
+@click.option("--test-size", type=click.INT, default=146, help='size of the test set for each fold')
+@click.option("--splits", type=click.INT, default=5, help="Number of CV splits to use")
 @click.option("--auth", type=click.STRING, default='gcs.secret.json', help="GCS keyfile")
 @click.argument("data_lr", type=click.STRING, default="erai/daily-1deg")
-def bcsd(data_lr, scale, region, var, auth, **kwargs):
+def bcsd(data_lr, scale, region, var, test_size, splits, auth, **kwargs):
     mlflow.log_param('region', region)
     mlflow.log_param('var', var)
     if scale == 2:
@@ -77,21 +84,21 @@ def bcsd(data_lr, scale, region, var, auth, **kwargs):
     logging.info(f'==== Starting run ====')
     data_lo, data_hi = load_data(data_lr, data_hr, region, auth, scale=scale)
     data_obs_lo, _ = load_data('ras/daily-1deg', data_hr, region, auth, scale=scale)
-    data_lo = data_lo[[var]].fillna(0.).clip(min=0.0, max=np.inf).to_array(dim='chan').transpose('Time','lat','lon','chan')
-    data_obs_lo = data_obs_lo[[var]].fillna(0.).clip(min=0.0, max=np.inf).to_array(dim='chan').transpose('Time','lat','lon','chan')
-    data_hi = data_hi[[var]].fillna(0.).clip(min=0.0, max=np.inf).to_array(dim='chan').transpose('Time','lat','lon','chan')
-    data_lo = xr.where(data_lo > 1.0, data_lo, 0.0)
-    data_obs_lo = xr.where(data_obs_lo > 1.0, data_obs_lo, 0.0)
-    data_hi = xr.where(data_hi > 1.0, data_hi, 0.0)
-    lr_train = data_lo.isel(Time=slice(0,data_lo.Time.size-2*365))
-    lr_test = data_lo.isel(Time=slice(data_lo.Time.size-2*365, data_lo.Time.size+1))
-    lr_obs_train = data_obs_lo.isel(Time=slice(0,data_lo.Time.size-2*365))
-    lr_obs_test = data_obs_lo.isel(Time=slice(data_lo.Time.size-2*365, data_lo.Time.size+1))
-    hr_train = data_hi.isel(Time=slice(0,data_lo.Time.size-2*365))
-    hr_test = data_hi.isel(Time=slice(data_lo.Time.size-2*365, data_lo.Time.size+1))
-    if var == 'MAXT':
-        fit_bcsd_maxt(lr_train, lr_test, lr_obs_train, lr_obs_test, hr_train, hr_test)
-    elif var == 'PRCP':
-        fit_bcsd_prcp(lr_train, lr_test, lr_obs_train, lr_obs_test, hr_train, hr_test)
-    else:
-        raise NotImplementError(f'variable {var} not recognized')
+    data_lo = data_lo[[var]].fillna(0.).clip(min=0.0, max=np.inf)
+    data_obs_lo = data_obs_lo[[var]].fillna(0.).clip(min=0.0, max=np.inf)
+    data_hi = data_hi[[var]].fillna(0.).clip(min=0.0, max=np.inf)
+    if var == 'PRCP':
+        data_lo = xr.where(data_lo > 1.0, data_lo, 0.0)
+        data_obs_lo = xr.where(data_obs_lo > 1.0, data_obs_lo, 0.0)
+        data_hi = xr.where(data_hi > 1.0, data_hi, 0.0)
+    split_fn = create_time_series_train_test_generator_v2(n_splits=splits, test_size=test_size)
+    folds = list(split_fn(data_lo, data_obs_lo, data_hi))
+    for i, fold in enumerate(folds):
+        logging.info(f'Fold {i+1}/{len(folds)}')
+        with mlflow.start_run(nested=True):
+            if var == 'MAXT':
+                fit_bcsd_maxt(fold, i)
+            elif var == 'PRCP':
+                fit_bcsd_prcp(fold, i)
+            else:
+                raise NotImplementError(f'variable {var} not recognized')

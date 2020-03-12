@@ -10,9 +10,9 @@ from utils.data import xr_to_tf_dataset
 from utils.preprocessing import remove_monthly_means, restore_monthly_means
 from experiments.common import prepare_downscaling_data
 
-eval_rmse = metrics.scaled_rmse_metric()
-eval_bias = metrics.bias_metric()
-eval_corr = metrics.correlation_metric()
+eval_rmse = metrics.scaled_rmse_metric(axis=0)
+eval_bias = metrics.bias_metric(axis=0)
+eval_corr = metrics.correlation_metric(axis=0)
 
 class TemperatureDataFold:
     def __init__(self, train, test, monthly_means):

@@ -15,6 +15,7 @@ import experiments.prcp_experiment_base as prcp
 from utils.plot import image_map_factory
 from utils.preprocessing import remove_monthly_means
 from utils.distributions import normal, bernoulli_gamma
+from utils.data import create_time_series_train_test_generator_v2
 from baselines.dscnn import create_bmd_cnn10
 from normalizing_flows.models import VariationalModel
 from normalizing_flows.utils import get_metrics
@@ -33,7 +34,8 @@ def bmd_plot(x, y, mean, samples, latlon_lo, latlon_hi):
         plot_fn(axs[1,i], samples[i].numpy(), latlon_hi[0], latlon_hi[1], title=f'sample {i}')
     return fig
 
-def fit_bmd_maxt(fold, epochs, lr, batch_size, buffer_size, validate_freq):
+def fit_bmd_maxt(fold, i, epochs, lr, batch_size, buffer_size, validate_freq):
+    mlflow.log_param('fold', i+1)
     indices = tdex.indices('Time', convert_units_fn=lambda x: x + 273.15)
     data_fold = maxt.preprocess_fold_maxt(fold)
     train_lo, train_hi = data_fold.train
@@ -89,7 +91,8 @@ def fit_bmd_maxt(fold, epochs, lr, batch_size, buffer_size, validate_freq):
         mlflow.log_artifact(f'/tmp/error-maps-epoch{j}.png', 'figures')
     shutil.rmtree(ckpt_dir)
         
-def fit_bmd_prcp(fold, epochs, lr, batch_size, buffer_size, validate_freq):
+def fit_bmd_prcp(fold, i, epochs, lr, batch_size, buffer_size, validate_freq):
+    mlflow.log_param('fold', i+1)
     indices = pdex.indices('Time')
     data_fold = prcp.preprocess_fold_prcp(fold)
     train_lo, train_hi = data_fold.train
@@ -147,6 +150,7 @@ def fit_bmd_prcp(fold, epochs, lr, batch_size, buffer_size, validate_freq):
         plt.savefig(f'/tmp/error-maps-epoch{j}.png')
         plt.close(fig)
         mlflow.log_artifact(f'/tmp/error-maps-epoch{j}.png', 'figures')
+    shutil.rmtree(ckpt_dir)
 
 @click.command(help="Fits and evaluates the Bano-Medina CNN10 on the ERA-I/Rasmussen dataset")
 @click.option("--scale", type=click.INT, required=True, help="Downscaling factor")
@@ -157,9 +161,12 @@ def fit_bmd_prcp(fold, epochs, lr, batch_size, buffer_size, validate_freq):
 @click.option("--validate-freq", type=click.INT, default=10)
 @click.option("--region", type=click.STRING, default='southeast_us')
 @click.option("--var", type=click.STRING, default='MAXT', help="Dataset var name")
+@click.option("--test-size", type=click.INT, default=146, help='size of the test set for each fold')
+@click.option("--splits", type=click.INT, default=5, help="Number of CV splits to use")
 @click.option("--auth", type=click.STRING, default='gcs.secret.json', help="GCS keyfile")
 @click.argument("data_lr", type=click.STRING, default="ras/daily-1deg")
-def bmd(data_lr, scale, epochs, learning_rate, batch_size, buffer_size, validate_freq, region, var, auth, **kwargs):
+def bmd(data_lr, scale, epochs, learning_rate, batch_size, buffer_size, validate_freq, region,
+        var, test_size, splits, auth, **kwargs):
     mlflow.log_param('region', region)
     mlflow.log_param('var', var)
     if scale == 2:
@@ -172,22 +179,23 @@ def bmd(data_lr, scale, epochs, learning_rate, batch_size, buffer_size, validate
         raise NotImplementedError(f'unsupported downscaling factor {scale}')
     logging.info(f'==== Starting run ====')
     data_lo, data_hi = load_data(data_lr, data_hr, region, auth, scale=scale)
-    data_lo = data_lo[[var]].fillna(0.).clip(min=0.0, max=np.inf).to_array(dim='chan').transpose('Time','lat','lon','chan')
-    data_hi = data_hi[[var]].fillna(0.).clip(min=0.0, max=np.inf).to_array(dim='chan').transpose('Time','lat','lon','chan')
+    data_lo = data_lo[[var]].fillna(0.).clip(min=0.0, max=np.inf)
+    data_hi = data_hi[[var]].fillna(0.).clip(min=0.0, max=np.inf)
     if var == 'PRCP':
         data_lo = prcp.preprocess_dataset(data_lo, (data_lo.Time.size, data_lo.lat.size, data_lo.lon.size, 1), epsilon=1.0)
         data_lo = xr.where(data_lo > 1.0, data_lo, 0.0)
         data_hi = prcp.preprocess_dataset(data_hi, (data_hi.Time.size, data_hi.lat.size, data_hi.lon.size, 1), epsilon=1.0)
         data_hi = xr.where(data_hi > 1.0, data_hi, 0.0)
-    lr_train = data_lo.isel(Time=slice(0,data_lo.Time.size-2*365))
-    lr_test = data_lo.isel(Time=slice(data_lo.Time.size-2*365, data_lo.Time.size+1))
-    hr_train = data_hi.isel(Time=slice(0,data_lo.Time.size-2*365))
-    hr_test = data_hi.isel(Time=slice(data_lo.Time.size-2*365, data_lo.Time.size+1))
-    if var == 'MAXT':
-        fit_bmd_maxt(((lr_train, hr_train), (lr_test, hr_test)), epochs, learning_rate,
-                     batch_size, buffer_size, validate_freq)
-    elif var == 'PRCP':
-        fit_bmd_prcp(((lr_train, hr_train), (lr_test, hr_test)), epochs, learning_rate,
-                     batch_size, buffer_size, validate_freq)
-    else:
-        raise NotImplementedError(f'unrecognized variable {var}')
+    split_fn = create_time_series_train_test_generator_v2(n_splits=splits, test_size=test_size)
+    folds = list(split_fn(data_lo, data_hi))
+    for i, fold in enumerate(folds):
+        logging.info(f'Fold {i+1}/{len(folds)}')
+        with mlflow.start_run(nested=True):
+            if var == 'MAXT':
+                fit_bmd_maxt(fold, i, epochs, learning_rate,
+                             batch_size, buffer_size, validate_freq)
+            elif var == 'PRCP':
+                fit_bmd_prcp(fold, i, epochs, learning_rate,
+                             batch_size, buffer_size, validate_freq)
+            else:
+                raise NotImplementedError(f'unrecognized variable {var}')

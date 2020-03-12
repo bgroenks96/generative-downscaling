@@ -64,6 +64,26 @@ def create_time_series_train_test_generator(n_splits=2, time_dim='Time', var_dim
             test_data = [dataset_to_array(ds).isel({time_dim: test_inds}) for ds in datasets]
             yield train_data, test_data
     return time_series_split
+
+def create_time_series_train_test_generator_v2(n_splits=2, test_size=30, time_dim='Time', var_dim='chan'):
+    def dataset_to_array(ds):
+        arr = ds.to_array(dim=var_dim)
+        return arr.transpose(*arr.dims[1:], var_dim)
+    def split(n):
+        n = int(n)
+        inds = list(range(n))
+        for i in range(n_splits):
+            test_st = n-(n_splits - i)*test_size
+            train_inds = inds[i*test_size:test_st]
+            test_inds = inds[test_st:test_st+test_size]
+            yield train_inds, test_inds
+    def time_series_split(*datasets):
+        N = datasets[0][time_dim].size
+        for train, test in split(N):
+            train_data = [dataset_to_array(ds).isel({time_dim: train}) for ds in datasets]
+            test_data = [dataset_to_array(ds).isel({time_dim: test}) for ds in datasets]
+            yield train_data, test_data
+    return time_series_split
         
 def generate_seasonal_inds(X, n_folds=1, test_ratio=0.2, rand_seed=None):
     """

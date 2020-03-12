@@ -11,7 +11,7 @@ import climdex.temperature as tdex
 import climdex.precipitation as pdex
 import experiments.maxt_experiment_base as maxt
 import experiments.prcp_experiment_base as prcp
-from utils.data import create_time_series_train_test_generator
+from utils.data import create_time_series_train_test_generator_v2
 from utils.plot import image_map_factory
 from models.glow import build_jflvm
 from experiments.common import load_data, predict_batched, upsample
@@ -222,13 +222,14 @@ def fit_glow_jflvm_prcp(fold, i, layers, depth, min_filters, max_filters, lam, a
 @click.option("--epsilon", type=click.FLOAT, default=1.0, help="Wet vs dry cut off threshold for precipitation")
 @click.option("--prior", type=click.STRING, default="standard", help="Informative vs non-informative prior. Does nothing for precipitation.")
 @click.option("--mode", type=click.STRING, default='cv', help="'cv' for cross validation 'test' for test set evaluation")
-@click.option("--splits", type=click.INT, default=3, help="Number of CV splits to use")
+@click.option("--test-size", type=click.INT, default=146, help='size of the test set for each fold')
+@click.option("--splits", type=click.INT, default=5, help="Number of CV splits to use")
 @click.option("--region", type=click.STRING, default='southeast_us')
 @click.option("--var", type=click.STRING, default='MAXT', help="Dataset var name")
 @click.option("--supervised", type=click.BOOL, default=False, help="Whether or not to use supervised training (paired samples)")
 @click.option("--auth", type=click.STRING, default='gcs.secret.json', help="GCS keyfile")
 @click.argument("data_lr")
-def glow_jflvm(data_lr, scale, mode, epsilon, splits, region, var, auth, **kwargs):
+def glow_jflvm(data_lr, scale, mode, epsilon, test_size, splits, region, var, auth, **kwargs):
     mlflow.log_param('region', region)
     mlflow.log_param('var', var)
     if scale == 2:
@@ -250,31 +251,16 @@ def glow_jflvm(data_lr, scale, mode, epsilon, splits, region, var, auth, **kwarg
         # create train/test splits
         data_lo = data_lo.isel(Time=slice(0,data_lo.Time.size-2*365))
         data_hi = data_hi.isel(Time=slice(0,data_hi.Time.size-2*365))
-        split_fn = create_time_series_train_test_generator(n_splits=splits)
-        folds = list(split_fn(data_lo, data_hi))
-        for i, fold in enumerate(folds):
-            logging.info(f'Fold {i+1}/{len(folds)}')
-            with mlflow.start_run(nested=True):
-                if var == 'MAXT':
-                    fit_glow_jflvm_maxt(fold, i, **kwargs)
-                elif var == 'PRCP':
-                    fit_glow_jflvm_prcp(fold, i, epsilon=epsilon, **kwargs)
-                else:
-                    raise NotImplementedError(f"variable {var} not supported")
-    elif mode == 'test':
-        data_lo = data_lo.to_array(dim='chan').transpose('Time','lat','lon','chan')
-        data_hi = data_hi.to_array(dim='chan').transpose('Time','lat','lon','chan')
-        lr_train = data_lo.isel(Time=slice(0,data_lo.Time.size-2*365))
-        lr_test = data_lo.isel(Time=slice(data_lo.Time.size-2*365, data_lo.Time.size+1))
-        hr_train = data_hi.isel(Time=slice(0,data_hi.Time.size-2*365))
-        hr_test = data_hi.isel(Time=slice(data_hi.Time.size-2*365, data_lo.Time.size+1))
-        fold = ((lr_train, hr_train), (lr_test, hr_test))
-        if var == 'MAXT':
+    elif mode != 'test':
+        raise NotImplementedError(f'mode not recognized: {mode}')
+    split_fn = create_time_series_train_test_generator_v2(n_splits=splits, test_size=test_size)
+    folds = list(split_fn(data_lo, data_hi))
+    for i, fold in enumerate(folds):
+        logging.info(f'Fold {i+1}/{len(folds)}')
+        with mlflow.start_run(nested=True):
             if var == 'MAXT':
-                fit_glow_jflvm_maxt(fold, 0, **kwargs)
+                fit_glow_jflvm_maxt(fold, i, **kwargs)
             elif var == 'PRCP':
-                fit_glow_jflvm_prcp(fold, 0, **kwargs)
+                fit_glow_jflvm_prcp(fold, i, epsilon=epsilon, **kwargs)
             else:
                 raise NotImplementedError(f"variable {var} not supported")
-    else:
-        raise NotImplementedError(f'mode not recognized: {mode}')
