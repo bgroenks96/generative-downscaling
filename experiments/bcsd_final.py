@@ -15,6 +15,7 @@ from utils.preprocessing import remove_monthly_means
 from utils.data import create_time_series_train_test_generator_v2
 from baselines.bcsd import BCSD
 from experiments.common import load_data
+from dask.distributed import Client
 
 def fit_bcsd_maxt(fold, i):
     mlflow.log_param('fold', i+1)
@@ -68,9 +69,13 @@ def fit_bcsd_prcp(fold, i):
 @click.option("--var", type=click.STRING, default='MAXT', help="Dataset var name")
 @click.option("--test-size", type=click.INT, default=146, help='size of the test set for each fold')
 @click.option("--splits", type=click.INT, default=5, help="Number of CV splits to use")
+@click.option("--dask-host", type=click.STRING, default=None, help="Host address of dask scheduler to use")
 @click.option("--auth", type=click.STRING, default='gcs.secret.json', help="GCS keyfile")
 @click.argument("data_lr", type=click.STRING, default="erai/daily-1deg")
-def bcsd(data_lr, scale, region, var, test_size, splits, auth, **kwargs):
+def bcsd(data_lr, scale, region, var, test_size, splits, dask_host, auth, **kwargs):
+    if dask_host is not None and dask_host != "":
+        # sets default dask client to use dask_host as scheduler
+        client = Client(dask_host)
     mlflow.log_param('region', region)
     mlflow.log_param('var', var)
     if scale == 2:

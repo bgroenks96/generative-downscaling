@@ -182,9 +182,9 @@ def bmd(data_lr, scale, epochs, learning_rate, batch_size, buffer_size, validate
     data_lo = data_lo[[var]].fillna(0.).clip(min=0.0, max=np.inf)
     data_hi = data_hi[[var]].fillna(0.).clip(min=0.0, max=np.inf)
     if var == 'PRCP':
-        data_lo = prcp.preprocess_dataset(data_lo, (data_lo.Time.size, data_lo.lat.size, data_lo.lon.size, 1), epsilon=1.0)
+        data_lo = prcp.preprocess_dataset(data_lo, (data_lo.Time.size, data_lo.lat.size, data_lo.lon.size), epsilon=1.0)
         data_lo = xr.where(data_lo > 1.0, data_lo, 0.0)
-        data_hi = prcp.preprocess_dataset(data_hi, (data_hi.Time.size, data_hi.lat.size, data_hi.lon.size, 1), epsilon=1.0)
+        data_hi = prcp.preprocess_dataset(data_hi, (data_hi.Time.size, data_hi.lat.size, data_hi.lon.size), epsilon=1.0)
         data_hi = xr.where(data_hi > 1.0, data_hi, 0.0)
     split_fn = create_time_series_train_test_generator_v2(n_splits=splits, test_size=test_size)
     folds = list(split_fn(data_lo, data_hi))

@@ -20,7 +20,7 @@ entry_points:
       prior: {type: string, default: "standard"}
       mode: {type: string, default: "cv"}
       test_size: {type: int, default: 146}
-      splits: {type: int, default: 3}
+      splits: {type: int, default: 5}
       var: {type: string, default: "MAXT"}
       region: {type: string, default: "southeast_us"}
       auth: {type: string, default: "gcs.secret.json"}
@@ -36,11 +36,12 @@ entry_points:
       scale: {type: int, default: 4}
       var: {type: string, default: "MAXT"}
       test_size: {type: int, default: 146}
-      splits: {type: int, default: 3}
+      splits: {type: int, default: 5}
+      dask_host: {type: string, default: ""}
       auth: {type: string, default: "gcs.secret.json"}
       
     command: "python run_experiment.py bcsd {data_lr} --scale {scale} --var {var} --test-size {test_size} \
-                --splits {splits} --auth {auth}"
+                --splits {splits} --dask-host {dask_host} --auth {auth}"
     
   bmd:
     parameters:
@@ -50,7 +51,7 @@ entry_points:
       validate_freq: {type: int, default: 10}
       var: {type: string, default: "MAXT"}
       test_size: {type: int, default: 146}
-      splits: {type: int, default: 3}
+      splits: {type: int, default: 5}
       data_lr: {type: string, default: "ras/daily-1deg"}
       auth: {type: string, default: "gcs.secret.json"}
       

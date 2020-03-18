@@ -79,7 +79,9 @@ def plot_error_maps(metrics, lat, lon):
     rmse_max = np.quantile(metrics['rmse'], 0.95).round(2)
     plot_fn(axs[0], metrics['rmse'], lat, lon, title='spatial rmse', cmap='Reds', min_max=(0.0, rmse_max))
     bias_max = np.quantile(metrics['bias'], 0.95).round(2)
-    plot_fn(axs[1], metrics['bias'], lat, lon, title='spatial bias', cmap='bwr', min_max=(-bias_max, bias_max))
-    qqrsq_min = metrics['corr'].min()
-    plot_fn(axs[2], metrics['corr'], lat, lon, title='correlation per dim', cmap='copper', min_max=(qqrsq_min,1.0))
+    bias_min = np.quantile(metrics['bias'], 0.05).round(2)
+    bias_bound = np.maximum(np.abs(bias_max), np.abs(bias_min))
+    plot_fn(axs[1], metrics['bias'], lat, lon, title='spatial bias', cmap='bwr', min_max=(-bias_bound, bias_bound))
+    corr_min = metrics['corr'].min()
+    plot_fn(axs[2], metrics['corr'], lat, lon, title='correlation per dim', cmap='copper', min_max=(corr_min,1.0))
     return fig
