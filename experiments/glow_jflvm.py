@@ -81,13 +81,13 @@ def fit_glow_jflvm_maxt(fold, i, layers, depth, min_filters, max_filters, lam, a
     monthly_means_lo, monthly_means_hi = data_fold.monthly_means
     train_ds = data_fold.train_dataset(batch_size=batch_size, buffer_size=buffer_size,
                                        map_fn_lo=upsample(wt_hi, ht_hi, tf.image.ResizeMethod.NEAREST_NEIGHBOR),
-                                       supervised=supervised)
+                                       supervised='supervised' if supervised else 'unsupervised')
     test_ds = data_fold.test_dataset(batch_size=batch_size, buffer_size=buffer_size,
                                      map_fn_lo=upsample(wt_hi, ht_hi, tf.image.ResizeMethod.NEAREST_NEIGHBOR),
-                                     supervised=supervised)
+                                     supervised='supervised' if supervised else 'unsupervised')
     test_ds_paired = data_fold.test_dataset(batch_size=10*batch_size, buffer_size=buffer_size,
                                             map_fn_lo=upsample(wt_hi, ht_hi, tf.image.ResizeMethod.NEAREST_NEIGHBOR),
-                                            supervised=True)
+                                            supervised='test')
     scale = wt_hi // wt
     if prior == 'standard':
         prior_dist = tfp.distributions.Normal(loc=0.0, scale=1.0)
@@ -155,13 +155,13 @@ def fit_glow_jflvm_prcp(fold, i, layers, depth, min_filters, max_filters, lam, a
     scale = wt_hi // wt
     train_ds = data_fold.train_dataset(batch_size=batch_size, buffer_size=buffer_size,
                                        map_fn_lo=upsample(wt_hi, ht_hi, tf.image.ResizeMethod.NEAREST_NEIGHBOR),
-                                       supervised=supervised)
+                                       supervised='supervised' if supervised else 'unsupervised')
     test_ds = data_fold.test_dataset(batch_size=batch_size, buffer_size=buffer_size,
                                      map_fn_lo=upsample(wt_hi, ht_hi, tf.image.ResizeMethod.NEAREST_NEIGHBOR),
-                                     supervised=supervised)
+                                     supervised='supervised' if supervised else 'unsupervised')
     test_ds_paired = data_fold.test_dataset(batch_size=10*batch_size, buffer_size=buffer_size,
                                             map_fn_lo=upsample(wt_hi, ht_hi, tf.image.ResizeMethod.NEAREST_NEIGHBOR),
-                                            supervised=True)
+                                            supervised='test')
     model_joint = build_jflvm((None,wt_hi,ht_hi,1), scale, layers, depth,
                               min_filters=min_filters, max_filters=max_filters,
                               dnet_layers=dnet_layers, dnet_filters=dnet_filters)

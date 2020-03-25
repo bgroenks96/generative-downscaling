@@ -44,9 +44,9 @@ def fit_bmd_maxt(fold, i, epochs, lr, batch_size, buffer_size, validate_freq):
     (ht_lr, wt_lr), (ht_hi, wt_hi) = train_lo.shape[1:3], train_hi.shape[1:3]
     monthly_means_lo, monthly_means_hi = data_fold.monthly_means
     train_ds = data_fold.train_dataset(batch_size=batch_size, buffer_size=buffer_size,
-                                       supervised=True)
+                                       mode='supervised')
     test_ds = data_fold.test_dataset(batch_size=batch_size, buffer_size=N_test,
-                                     supervised=True)
+                                     mode='test')
     scale = wt_hi // wt_lr
     encoder = create_bmd_cnn10(ht_lr, wt_lr, scale=scale, c_out=2)
     model = VariationalModel(encoder, normal(), optimizer=tf.keras.optimizers.Adam(lr=lr), output_shape=(None,ht_hi,wt_hi,1))
@@ -100,9 +100,9 @@ def fit_bmd_prcp(fold, i, epochs, lr, batch_size, buffer_size, validate_freq):
     N_train, N_test = train_lo.Time.size, test_lo.Time.size
     (ht_lr, wt_lr), (ht_hi, wt_hi) = train_lo.shape[1:3], train_hi.shape[1:3]
     train_ds = data_fold.train_dataset(batch_size=batch_size, buffer_size=buffer_size,
-                                       supervised=True)
+                                       mode='supervised')
     test_ds = data_fold.test_dataset(batch_size=batch_size, buffer_size=N_test,
-                                     supervised=True)
+                                     mode='test')
     scale = wt_hi // wt_lr
     encoder = create_bmd_cnn10(ht_lr, wt_lr, scale=scale, c_out=3)
     model = VariationalModel(encoder, bernoulli_gamma(), optimizer=tf.keras.optimizers.Adam(lr=lr), output_shape=(None,ht_hi,wt_hi,1))
@@ -189,6 +189,8 @@ def bmd(data_lr, scale, epochs, learning_rate, batch_size, buffer_size, validate
     split_fn = create_time_series_train_test_generator_v2(n_splits=splits, test_size=test_size)
     folds = list(split_fn(data_lo, data_hi))
     for i, fold in enumerate(folds):
+        if i < 4:
+            continue
         logging.info(f'Fold {i+1}/{len(folds)}')
         with mlflow.start_run(nested=True):
             if var == 'MAXT':

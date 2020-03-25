@@ -9,11 +9,14 @@ def upsample(new_wt, new_ht, method, scale_factor=1):
         return tf.image.resize(x, (new_wt,new_ht), method=method) / scale_factor
     return _upsample
 
-def prepare_downscaling_data(data_lo, data_hi, batch_size=100, buffer_size=1000, supervised=True):
-    if supervised:
+def prepare_downscaling_data(data_lo, data_hi, batch_size=100, buffer_size=1000, mode='supervised'):
+    if mode == 'supervised':
         data = tf.data.Dataset.zip((data_lo, data_hi)).shuffle(buffer_size)
-    else:
+    elif mode == 'unsupervised':
         data = tf.data.Dataset.zip((data_lo.shuffle(buffer_size), data_hi.shuffle(buffer_size)))
+    elif mode == 'test':
+        # no shuffling for test mode
+        data = tf.data.Dataset.zip((data_lo, data_hi))
     return data.batch(batch_size)
 
 def load_data(data_lr, data_hr, region, auth_token, scale=4, project='thesis-research-255223'):
