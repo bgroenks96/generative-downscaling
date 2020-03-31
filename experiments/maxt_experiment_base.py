@@ -35,17 +35,17 @@ class TemperatureDataFold:
     def test_dataset(self, **kwargs):
         return self.to_dataset(*self.test, **kwargs)
     
-def preprocess_fold_maxt(fold):
+def preprocess_fold_maxt(fold, time_dim='Time'):
     (train_lo, train_hi), (test_lo, test_hi) = fold
-    train_lo, monthly_means_lo = remove_monthly_means(train_lo)
-    train_hi, monthly_means_hi = remove_monthly_means(train_hi)
-    test_lo,_ = remove_monthly_means(test_lo, monthly_means_lo)
-    test_hi,_ = remove_monthly_means(test_hi, monthly_means_hi)
+    train_lo, monthly_means_lo = remove_monthly_means(train_lo, time_dim=time_dim)
+    train_hi, monthly_means_hi = remove_monthly_means(train_hi, time_dim=time_dim)
+    test_lo,_ = remove_monthly_means(test_lo, monthly_means_lo, time_dim=time_dim)
+    test_hi,_ = remove_monthly_means(test_hi, monthly_means_hi, time_dim=time_dim)
     return TemperatureDataFold((train_lo, train_hi),
                                (test_lo, test_hi),
                                (monthly_means_lo, monthly_means_hi))
 
-def eval_metrics(indices, true: tf.Tensor, pred: tf.Tensor, coords, monthly_means=None):
+def eval_metrics(indices, true: tf.Tensor, pred: tf.Tensor, coords, monthly_means=None, time_dim='Time'):
     # pointwise metrics
     rmse = eval_rmse(true, pred).numpy()
     bias = eval_bias(true, pred).numpy()
@@ -53,7 +53,7 @@ def eval_metrics(indices, true: tf.Tensor, pred: tf.Tensor, coords, monthly_mean
     # climdex indices
     pred_arr = xr.DataArray(pred.numpy(), coords=coords)
     if monthly_means is not None:
-        pred_arr = restore_monthly_means(pred_arr, monthly_means)
+        pred_arr = restore_monthly_means(pred_arr, monthly_means, time_dim=time_dim)
     txx = indices.monthly_txx(pred_arr)
     txn = indices.monthly_txn(pred_arr)
     txid = indices.annual_icing_days(pred_arr)

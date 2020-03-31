@@ -49,7 +49,6 @@ def fit_bcsd_prcp(fold, i):
     assert not np.any(np.isnan(hr_pred.values))
     hr_pred = xr.DataArray(hr_pred, coords=hr_test.coords, dims=hr_test.dims)
     y_true, y_pred = tf.constant(hr_test.values, dtype=tf.float32), tf.constant(hr_pred.values, dtype=tf.float32)
-    #y_true, y_pred = tf.math.pow(y_true, 3.0), tf.math.pow(y_pred, 3.0)
     metrics = prcp.eval_metrics(indices, y_true, y_pred, hr_test.coords)
     np.savez('/tmp/metrics.npz', **metrics)
     mlflow.log_artifact('/tmp/metrics.npz', 'data')

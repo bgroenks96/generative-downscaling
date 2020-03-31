@@ -69,7 +69,10 @@ class BCSD:
 
     def fit(self, lr: xr.DataArray, obsv: xr.DataArray, obsv_lr: xr.DataArray=None, batch_size=10):
         if obsv_lr is None:
-            obsv_lr = obsv.interp(lat=lr.lat, lon=lr.lon, method=self.interp)
+            lat_lo = obsv.lat.sel(lat=lr.lat, method='nearest')
+            lon_lo = obsv.lon.sel(lon=lr.lon, method='nearest')
+            obsv_lr = obsv.interp(lat=lat_lo, lon=lon_lo, method='linear')
+        assert not np.any(np.isnan(obsv_lr))
         self.hr_coords = obsv.coords
         self.hr_dims = obsv.dims
         # fit quantile map
@@ -111,7 +114,7 @@ class BCSD:
             y_pred_per_day.append(self.scaling_factors[day]*lr_mapped_interp)
         # concatenate and sort all days
         y_pred = xr.concat(y_pred_per_day, dim=self.time_dim)
-        y_pred = y_pred.isel({self.time_dim: y_pred.Time.argsort().values})
+        y_pred = y_pred.isel({self.time_dim: y_pred.coords[self.time_dim].argsort().values})
         y_pred = y_pred.transpose(self.time_dim, *y_pred.dims[:-1])
         return y_pred
     
