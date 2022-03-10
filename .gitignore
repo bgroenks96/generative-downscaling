@@ -107,3 +107,4 @@ venv.bak/
 data/
 *.secret.json
 mlruns/
+*.code-workspace
