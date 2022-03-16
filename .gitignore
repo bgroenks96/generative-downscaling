@@ -104,6 +104,7 @@ venv.bak/
 .mypy_cache/
 
 # misc
-data/
+data/**
 *.secret.json
 mlruns/
+*.code-workspace
