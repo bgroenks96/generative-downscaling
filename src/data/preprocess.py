@@ -17,8 +17,8 @@ log = logging.getLogger(__name__)
 
 
 EPSILON = .0001
-NA_LAT = (25.3125, 64.6875+EPSILON)  # epsilon to avoid non-inclusive right
-NA_LON = (-129.375, -78.75+EPSILON)  # epsilon to avoid non-inclusive right
+NA_LAT = (0, 95+EPSILON)  # epsilon to avoid non-inclusive right
+NA_LON = (-140, -50+EPSILON)  # epsilon to avoid non-inclusive right
 KELVIN_TO_CELSIUS = -273.15
 
 
